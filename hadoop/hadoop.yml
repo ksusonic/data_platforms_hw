@@ -3,16 +3,27 @@
   hosts: hadoop_cluster
   become: yes
   vars:
-    hadoop_version: 3.3.4 # Укажите версию Hadoop
+    ansible_remote_tmp: /tmp
+    hadoop_version: 3.3.4
     hadoop_install_dir: /opt/hadoop
     hadoop_user: hadoop
 
   tasks:
+    - name: Создание директории для Hadoop, если она не существует
+      file:
+        path: "{{ hadoop_install_dir }}"
+        state: directory
+        mode: "0755"
+        owner: "{{ hadoop_user }}"
+        group: "{{ hadoop_user }}"
+
     - name: Установка необходимых пакетов
       apt:
         name:
           - openjdk-11-jdk
-          - rsync
+          - tar
+          - unzip
+          - gzip
         state: present
         update_cache: yes
 
@@ -24,7 +35,7 @@
 
     - name: Загрузка архива Hadoop
       get_url:
-        url: "https://downloads.apache.org/hadoop/common/hadoop-{{ hadoop_version }}/hadoop-{{ hadoop_version }}.tar.gz"
+        url: "https://www.apache.org/dyn/closer.cgi/hadoop/common/hadoop-{{ hadoop_version }}/hadoop-{{ hadoop_version }}.tar.gz"
         dest: /tmp/hadoop.tar.gz
 
     - name: Распаковка архива Hadoop
