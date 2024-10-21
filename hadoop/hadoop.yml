@@ -1,0 +1,76 @@
+---
+- name: Установка Hadoop на NameNode и DataNode
+  hosts: hadoop_cluster
+  become: yes
+  vars:
+    hadoop_version: 3.3.4 # Укажите версию Hadoop
+    hadoop_install_dir: /opt/hadoop
+    hadoop_user: hadoop
+
+  tasks:
+    - name: Установка необходимых пакетов
+      apt:
+        name:
+          - openjdk-11-jdk
+          - ssh
+          - rsync
+        state: present
+        update_cache: yes
+
+    - name: Создание пользователя hadoop
+      user:
+        name: "{{ hadoop_user }}"
+        shell: /bin/bash
+        create_home: yes
+
+    - name: Загрузка архива Hadoop
+      get_url:
+        url: "https://downloads.apache.org/hadoop/common/hadoop-{{ hadoop_version }}/hadoop-{{ hadoop_version }}-bin.tar.gz"
+        dest: /tmp/hadoop.tar.gz
+
+    - name: Распаковка архива Hadoop
+      unarchive:
+        src: /tmp/hadoop.tar.gz
+        dest: "{{ hadoop_install_dir }}"
+        remote_src: yes
+
+    - name: Настройка переменных окружения для Hadoop
+      blockinfile:
+        path: /etc/profile.d/hadoop.sh
+        create: yes
+        block: |
+          export HADOOP_HOME={{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}
+          export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+          export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+
+    - name: Настройка файла core-site.xml
+      template:
+        src: core-site.xml.j2
+        dest: "{{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/etc/hadoop/core-site.xml"
+
+    - name: Настройка файла hdfs-site.xml
+      template:
+        src: hdfs-site.xml.j2
+        dest: "{{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/etc/hadoop/hdfs-site.xml"
+
+- name: Настройка NameNode и SecondaryNameNode на мастер-ноде
+  hosts: master
+  become: yes
+  tasks:
+    - name: Форматирование NameNode (только один раз)
+      command: "{{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/bin/hdfs namenode -format"
+      args:
+        creates: "/var/hadoop/dfs/name/current"
+
+    - name: Запуск NameNode и SecondaryNameNode
+      shell: |
+        {{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/sbin/hadoop-daemon.sh start namenode
+        {{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/sbin/hadoop-daemon.sh start secondarynamenode
+
+- name: Настройка DataNode на воркер-нодах
+  hosts: datanodes
+  become: yes
+  tasks:
+    - name: Запуск DataNode
+      shell: |
+        {{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/sbin/hadoop-daemon.sh start datanode
