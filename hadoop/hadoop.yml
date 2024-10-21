@@ -12,7 +12,6 @@
       apt:
         name:
           - openjdk-11-jdk
-          - ssh
           - rsync
         state: present
         update_cache: yes
@@ -25,7 +24,7 @@
 
     - name: Загрузка архива Hadoop
       get_url:
-        url: "https://downloads.apache.org/hadoop/common/hadoop-{{ hadoop_version }}/hadoop-{{ hadoop_version }}-bin.tar.gz"
+        url: "https://downloads.apache.org/hadoop/common/hadoop-{{ hadoop_version }}/hadoop-{{ hadoop_version }}.tar.gz"
         dest: /tmp/hadoop.tar.gz
 
     - name: Распаковка архива Hadoop
