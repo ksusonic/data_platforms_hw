@@ -1,0 +1,63 @@
+---
+- name: Установка Hadoop на серверах в кластере
+  hosts: hadoop_cluster
+  become: yes
+  vars:
+    hadoop_version: 3.3.4
+    hadoop_install_dir: /opt/hadoop
+    hadoop_user: hadoop
+
+  tasks:
+    - name: Установка необходимых пакетов
+      apt:
+        name:
+          - openjdk-11-jdk
+          - ssh
+          - rsync
+        state: present
+        update_cache: yes
+
+    - name: Создание пользователя Hadoop
+      user:
+        name: "{{ hadoop_user }}"
+        shell: /bin/bash
+        create_home: yes
+
+    - name: Загрузка Hadoop tarball
+      get_url:
+        url: "https://downloads.apache.org/hadoop/common/hadoop-{{ hadoop_version }}/hadoop-{{ hadoop_version }}-bin.tar.gz"
+        dest: /tmp/hadoop.tar.gz
+
+    - name: Распаковка Hadoop tarball
+      unarchive:
+        src: /tmp/hadoop.tar.gz
+        dest: "{{ hadoop_install_dir }}"
+        remote_src: yes
+
+    - name: Простановка переменных окружения
+      blockinfile:
+        path: /etc/profile.d/hadoop.sh
+        create: yes
+        block: |
+          export HADOOP_HOME={{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}
+          export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+          export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+
+    - name: Configure Hadoop core-site.xml
+      template:
+        src: core-site.xml.j2
+        dest: "{{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/etc/hadoop/core-site.xml"
+
+    - name: Конфигурация Hadoop hdfs-site.xml
+      template:
+        src: hdfs-site.xml.j2
+        dest: "{{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/etc/hadoop/hdfs-site.xml"
+
+    - name: Форматирование HDFS (only on NameNode)
+      command: "{{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/bin/hdfs namenode -format"
+      when: "'master' in group_names"
+
+    - name: Запуск HDFS-сервисов на namenode
+      shell: |
+        {{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/sbin/start-dfs.sh
+      when: "'master' in group_names"
