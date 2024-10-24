@@ -30,7 +30,19 @@ fi
 # Можно добавить новую namenode/datanode
 for node in $NAMENODE_IP $DATANODE_0_IP $DATANODE_1_IP; do
     echo "Добавляю ssh-ключ на ноду $node ..."
-    sshpass -p $PASSWORD ssh-copy-id $SCRIPT_USER@$node
+    sshpass -p $PASSWORD ssh-copy-id $node
+
+    echo "Выполняю добавление пользователя в sudoers на ноду $node ..."
+
+    sshpass -p $PASSWORD ssh -o StrictHostKeyChecking=no $node << EOF
+        if [[ -f /etc/sudoers.d/$USER ]]; then
+            echo "Пользователь $USER уже в списке sudo-пользователей"
+        else
+            echo "$PASSWORD" | sudo -S bash -c "echo '$USER ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/$USER"
+            echo "Пользователь $USER добавлен в список sudo-пользователей"
+        fi
+EOF
+
 done
 
 echo "▗▄▄▄  ▗▄▖ ▗▖  ▗▖▗▄▄▄▖"
