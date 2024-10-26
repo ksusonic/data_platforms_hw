@@ -1,86 +1,154 @@
 ---
-- name: Установка Hadoop на NameNode и DataNode
-  hosts: hadoop_cluster
-  become: yes
-  vars:
-    ansible_remote_tmp: /tmp
-    hadoop_version: 3.3.4
-    hadoop_install_dir: /opt/hadoop
-    hadoop_user: hadoop
+  - name: Установка Hadoop на кластер
+    hosts: hadoop_cluster
+    vars:
+      ansible_remote_tmp: /tmp
+      hadoop_version: 3.4.0
+      hadoop_install_dir: /opt/hadoop
+      hadoop_user: hadoop
+      master_node: "team-1-nn"
 
-  tasks:
-    - name: Создание директории для Hadoop, если она не существует
-      file:
-        path: "{{ hadoop_install_dir }}"
-        state: directory
-        mode: "0755"
-        owner: "{{ hadoop_user }}"
-        group: "{{ hadoop_user }}"
+    tasks:
+      - name: Создание пользователя hadoop
+        user:
+          name: "{{ hadoop_user }}"
+          shell: /bin/bash
+          create_home: yes
 
-    - name: Установка необходимых пакетов
-      apt:
-        name:
-          - openjdk-11-jdk
-          - tar
-          - unzip
-          - gzip
-        state: present
-        update_cache: yes
+      - name: Установка необходимых пакетов
+        become: yes
+        apt:
+          name:
+            - openjdk-11-jdk
+            - tar
+            - unzip
+            - gzip
+          state: present
 
-    - name: Создание пользователя hadoop
-      user:
-        name: "{{ hadoop_user }}"
-        shell: /bin/bash
-        create_home: yes
+      - name: Загрузка архива Hadoop
+        get_url:
+          url: "https://dlcdn.apache.org/hadoop/common/hadoop-{{ hadoop_version }}/hadoop-{{ hadoop_version }}.tar.gz"
+          dest: /tmp/hadoop-{{ hadoop_version }}.tar.gz
+          mode: "755"
+          # checksum: sha512:https://downloads.apache.org/hadoop/common/hadoop-{{ hadoop_version }}/hadoop-{{ hadoop_version }}.tar.gz.sha512
 
-    - name: Загрузка архива Hadoop
-      get_url:
-        url: "https://www.apache.org/dyn/closer.cgi/hadoop/common/hadoop-{{ hadoop_version }}/hadoop-{{ hadoop_version }}.tar.gz"
-        dest: /tmp/hadoop.tar.gz
+      - name: Распаковка архива Hadoop
+        unarchive:
+          src: /tmp/hadoop-{{ hadoop_version }}.tar.gz
+          dest: /tmp/
+          remote_src: yes
+          creates: /tmp/hadoop-{{ hadoop_version }}
 
-    - name: Распаковка архива Hadoop
-      unarchive:
-        src: /tmp/hadoop.tar.gz
-        dest: "{{ hadoop_install_dir }}"
-        remote_src: yes
+      - name: Копирование в {{ hadoop_install_dir }}
+        command: "cp -r /tmp/hadoop-{{ hadoop_version }} {{ hadoop_install_dir }}"
+        args:
+          creates: "{{ hadoop_install_dir }}"
 
-    - name: Настройка переменных окружения для Hadoop
-      blockinfile:
-        path: /etc/profile.d/hadoop.sh
-        create: yes
-        block: |
-          export HADOOP_HOME={{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}
-          export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
-          export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+      - name: Сделать hadoop владельцем {{ hadoop_install_dir }}
+        become: yes
+        command: chown -R -h hadoop:hadoop {{ hadoop_install_dir }}
 
-    - name: Настройка файла core-site.xml
-      template:
-        src: core-site.xml.j2
-        dest: "{{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/etc/hadoop/core-site.xml"
+      - name: Настройка переменных окружения для Hadoop
+        become: yes
+        blockinfile:
+          path: /etc/profile.d/hadoop.sh
+          create: yes
+          block: |
+            export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+            export HADOOP_HOME={{ hadoop_install_dir }}/
+            export HADOOP_MAPRED_HOME={{ hadoop_install_dir }}
+            export HADOOP_HDFS_HOME={{ hadoop_install_dir }}
+            export HADOOP_HOME={{ hadoop_install_dir }}
+            export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
 
-    - name: Настройка файла hdfs-site.xml
-      template:
-        src: hdfs-site.xml.j2
-        dest: "{{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/etc/hadoop/hdfs-site.xml"
+      - name: Создание директории /var/hadoop для hadoop
+        become: yes
+        file:
+          path: /var/hadoop
+          state: directory
+          owner: hadoop
 
-- name: Настройка NameNode и SecondaryNameNode на мастер-ноде
-  hosts: master
-  become: yes
-  tasks:
-    - name: Форматирование NameNode (только один раз)
-      command: "{{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/bin/hdfs namenode -format"
-      args:
-        creates: "/var/hadoop/dfs/name/current"
+      - name: Настройка переменных окружения для Hadoop
+        become: yes
+        blockinfile:
+          path: /etc/hosts
+          create: yes
+          block: |
+            192.168.1.171 team-1-nn
+            192.168.1.172 team-1-dn-0
+            192.168.1.173 team-1-dn-1
 
-    - name: Запуск NameNode и SecondaryNameNode
-      shell: |
-        {{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/sbin/hadoop-daemon.sh start namenode
-        {{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/sbin/hadoop-daemon.sh start secondarynamenode
+      - name: Генерация SSH ключа на узле master
+        become: yes
+        become_user: hadoop
+        user:
+          name: "{{ hadoop_user }}"
+          generate_ssh_key: yes
+          ssh_key_bits: 2048
+          ssh_key_comment: "{{ hadoop_user }}@{{ ansible_hostname }}"
+        when: inventory_hostname == master_node
 
-- name: Настройка DataNode на воркер-нодах
-  hosts: datanodes
-  become: yes
-  tasks:
-    - name: Запуск DataNode
-      shell: |
-        {{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}/sbin/hadoop-daemon.sh start datanode
+      - name: Извлечение публичного ключа с master узла
+        become: yes
+        become_user: hadoop
+        slurp:
+          src: "/home/{{ hadoop_user }}/.ssh/id_rsa.pub"
+        register: master_ssh_key
+        when: inventory_hostname == master_node
+
+      - name: Сохранение публичного ключа master в переменную
+        set_fact:
+          master_public_key: "{{ master_ssh_key['content'] | b64decode }}"
+        run_once: true
+        when: inventory_hostname == master_node
+
+      - name: Распространение публичного SSH ключа master на все узлы
+        become: yes
+        become_user: hadoop
+        authorized_key:
+          user: "{{ hadoop_user }}"
+          state: present
+          key: "{{ master_public_key }}"
+
+  - name: Настройка NameNode и SecondaryNameNode
+    become: yes
+    become_user: hadoop
+    hosts: master
+    tasks:
+      - name: Конфигурация core-site.xml
+        copy:
+          dest: "/opt/hadoop/etc/hadoop/core-site.xml"
+          src: core-site.xml.j2
+
+      - name: Конфигурация hdfs-site.xml
+        copy:
+          dest: /opt/hadoop/etc/hadoop/hdfs-site.xml
+          src: hdfs-site.xml.j2
+
+      - name: Конфигурация datanodes
+        copy:
+          dest: /opt/hadoop/etc/hadoop/workers
+          content: |
+            team-1-dn-0
+            team-1-dn-1
+
+      - name: Конфигурация mapred-site
+        copy:
+          dest: /opt/hadoop/etc/hadoop/mapred-site.xml
+          src: mapred-site.xml.j2
+
+      - name: Конфигурация yarn-site.xml
+        copy:
+          dest: /opt/hadoop/etc/hadoop/mapred-site.xml
+          src: mapred-site.xml.j2
+
+      - name: Остановка кластера (если запущен)
+        command: /opt/hadoop/sbin/stop-dfs.sh
+
+      # - name: Инициализация хранилища
+      #   run_once: true
+      #   register: init_hadoop_storage
+      #   command: /opt/hadoop/bin/hdfs namenode -format
+
+      - name: Запуск кластера (namenodes + datanodes)
+        command: /opt/hadoop/sbin/start-dfs.sh
