@@ -1,9 +1,9 @@
 [master]
-team-1-nn ansible_host=192.168.1.171
+team-42-nn ansible_host=192.168.1.171
 
 [datanodes]
-team-1-dn-0 ansible_host=192.168.1.172
-team-1-dn-1 ansible_host=192.168.1.173
+team-42-dn-0 ansible_host=192.168.1.172
+team-42-dn-1 ansible_host=192.168.1.173
 
 [hadoop_cluster:children]
 master

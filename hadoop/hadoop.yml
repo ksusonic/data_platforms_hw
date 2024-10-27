@@ -6,7 +6,7 @@
       hadoop_version: 3.4.0
       hadoop_install_dir: /opt/hadoop
       hadoop_user: hadoop
-      master_node: "team-1-nn"
+      master_node: "team-42-nn"
 
     tasks:
       - name: Создание пользователя hadoop
@@ -74,63 +74,100 @@
           path: /etc/hosts
           create: yes
           block: |
-            192.168.1.171 team-1-nn
-            192.168.1.172 team-1-dn-0
-            192.168.1.173 team-1-dn-1
+            192.168.1.171 team-42-nn
+            192.168.1.172 team-42-dn-0
+            192.168.1.173 team-42-dn-1
 
-      - name: Генерация SSH ключа на узле master
+      - name: Конфигурация core-site.xml
         become: yes
         become_user: hadoop
-        user:
-          name: "{{ hadoop_user }}"
-          generate_ssh_key: yes
-          ssh_key_bits: 2048
-          ssh_key_comment: "{{ hadoop_user }}@{{ ansible_hostname }}"
-        when: inventory_hostname == master_node
+        copy:
+          dest: "/opt/hadoop/etc/hadoop/core-site.xml"
+          src: core-site.xml.j2
 
-      - name: Извлечение публичного ключа с master узла
+      - name: Конфигурация hdfs-site.xml
         become: yes
         become_user: hadoop
+        copy:
+          dest: /opt/hadoop/etc/hadoop/hdfs-site.xml
+          src: hdfs-site.xml.j2
+
+  - name: Генерация пары SSH ключей для кластера Hadoop
+    hosts: localhost
+    gather_facts: no
+    vars:
+      ssh_key_file_path: /tmp/hadoop_ssh_key
+
+    tasks:
+      - name: Генерация пары SSH ключей для пользователя hadoop (если не существует)
+        ansible.builtin.command:
+          cmd: "ssh-keygen -t rsa -b 2048 -f {{ ssh_key_file_path }} -q -N ''"
+        args:
+          creates: "{{ ssh_key_file_path }}"
+
+      - name: Чтение сгенерированного приватного SSH ключа
         slurp:
-          src: "/home/{{ hadoop_user }}/.ssh/id_rsa.pub"
-        register: master_ssh_key
-        when: inventory_hostname == master_node
+          src: "{{ ssh_key_file_path }}"
+        register: ssh_private_key_content
 
-      - name: Сохранение публичного ключа master в переменную
+      - name: Чтение сгенерированного публичного SSH ключа
+        slurp:
+          src: "{{ ssh_key_file_path }}.pub"
+        register: ssh_public_key_content
+
+      - name: Установка фактов для передачи приватного и публичного ключей
         set_fact:
-          master_public_key: "{{ master_ssh_key['content'] | b64decode }}"
-        run_once: true
-        when: inventory_hostname == master_node
+          hadoop_private_key: "{{ ssh_private_key_content['content'] | b64decode }}"
+          hadoop_public_key: "{{ ssh_public_key_content['content'] | b64decode }}"
 
-      - name: Распространение публичного SSH ключа master на все узлы
-        become: yes
-        become_user: hadoop
+  - name: Распространение SSH ключей на узлы кластера Hadoop
+    hosts: hadoop_cluster
+    become: yes
+    become_user: hadoop
+    tasks:
+      - name: Создание директории .ssh для пользователя hadoop
+        file:
+          path: /home/hadoop/.ssh
+          state: directory
+          mode: "0700"
+
+      - name: Копирование приватного SSH ключа на каждый узел
+        copy:
+          content: "{{ hostvars['localhost']['hadoop_private_key'] }}"
+          dest: "/home/hadoop/.ssh/id_rsa"
+          mode: "0600"
+
+      - name: Копирование публичного SSH ключа на каждый узел
+        copy:
+          content: "{{ hostvars['localhost']['hadoop_public_key'] }}"
+          dest: "/home/hadoop/.ssh/id_rsa.pub"
+          mode: "0644"
+
+      - name: Добавление публичного ключа в authorized_keys
         authorized_key:
-          user: "{{ hadoop_user }}"
+          user: hadoop
           state: present
-          key: "{{ master_public_key }}"
+          key: "{{ hostvars['localhost']['hadoop_public_key'] }}"
+          manage_dir: no
+
+      - name: Создание директории для хранения данных DataNode
+        file:
+          path: /home/hadoop/hdfs/datanode
+          state: directory
+          owner: hadoop
+          mode: 0755
 
   - name: Настройка NameNode и SecondaryNameNode
     become: yes
     become_user: hadoop
     hosts: master
     tasks:
-      - name: Конфигурация core-site.xml
-        copy:
-          dest: "/opt/hadoop/etc/hadoop/core-site.xml"
-          src: core-site.xml.j2
-
-      - name: Конфигурация hdfs-site.xml
-        copy:
-          dest: /opt/hadoop/etc/hadoop/hdfs-site.xml
-          src: hdfs-site.xml.j2
-
-      - name: Конфигурация datanodes
+      - name: Упоминание существующих datanodes (etc/hadoop/workers)
         copy:
           dest: /opt/hadoop/etc/hadoop/workers
           content: |
-            team-1-dn-0
-            team-1-dn-1
+            team-42-dn-0
+            team-42-dn-1
 
       - name: Конфигурация mapred-site
         copy:
@@ -145,6 +182,7 @@
       - name: Остановка кластера (если запущен)
         command: /opt/hadoop/sbin/stop-dfs.sh
 
+      # Необходимо запустить ровно 1 раз, тк перетрет существующие данные
       # - name: Инициализация хранилища
       #   run_once: true
       #   register: init_hadoop_storage
