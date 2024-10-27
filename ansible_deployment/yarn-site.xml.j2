@@ -1,0 +1,26 @@
+<configuration>
+    <property>
+        <name>yarn.resourcemanager.hostname</name>
+        <value>team-42-nn</value>
+    </property>
+    <property>
+        <name>yarn.nodemanager.aux-services</name>
+        <value>mapreduce_shuffle</value>
+    </property>
+    <property>
+        <name>yarn.nodemanager.aux-services.mapreduce.shuffle.class</name>
+        <value>org.apache.hadoop.mapred.ShuffleHandler</value>
+    </property>
+    <property>
+        <name>yarn.historyServer.address</name>
+        <value>team-42-nn:19888</value>
+    </property>
+    <property>
+        <name>yarn.historyServer.webapp.address</name>
+        <value>team-42-nn:19888</value>
+    </property>
+    <property>
+        <name>mapreduce.history.server.address</name>
+        <value>team-42-nn:19888</value>
+    </property>
+</configuration>
