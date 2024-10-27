@@ -1,3 +1,4 @@
+ # Прокси для Hadoop
 server {
     listen 80;
 
@@ -7,5 +8,31 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+
+# Прокси для ResourceManager
+server {
+    listen 81;
+
+    location / {
+        proxy_pass http://team-42-nn:8088/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Прокси для History Server
+server {
+    listen 82;
+
+    location / {
+        proxy_pass http://team-42-nn:19888/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }

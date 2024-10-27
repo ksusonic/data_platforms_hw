@@ -157,7 +157,7 @@
           owner: hadoop
           mode: 0755
 
-  - name: Настройка NameNode и SecondaryNameNode
+  - name: Запуск Hadoop (master+datanodes) и YARN (master)
     become: yes
     become_user: hadoop
     hosts: master
@@ -176,17 +176,28 @@
 
       - name: Конфигурация yarn-site.xml
         copy:
-          dest: /opt/hadoop/etc/hadoop/mapred-site.xml
-          src: mapred-site.xml.j2
+          dest: /opt/hadoop/etc/hadoop/yarn-site.xml
+          src: yarn-site.xml.j2
 
-      - name: Остановка кластера (если запущен)
-        command: /opt/hadoop/sbin/stop-dfs.sh
+      # Необходимо запустить ровно 1 раз, тк может стереть существующие данные
+      - name: Инициализация хранилища
+        run_once: true
+        register: init_hadoop_storage
+        command: /opt/hadoop/bin/hdfs namenode -format
 
-      # Необходимо запустить ровно 1 раз, тк перетрет существующие данные
-      # - name: Инициализация хранилища
-      #   run_once: true
-      #   register: init_hadoop_storage
-      #   command: /opt/hadoop/bin/hdfs namenode -format
-
-      - name: Запуск кластера (namenodes + datanodes)
+      - name: Старт Hadoop-кластера
         command: /opt/hadoop/sbin/start-dfs.sh
+
+      - name: Старт YARN-кластера
+        command: /opt/hadoop/sbin/start-yarn.sh
+
+  - name: Запуск YARN (datanodes)
+    become: yes
+    become_user: hadoop
+    hosts: datanodes
+    tasks:
+      - name: Запуск NodeManager на узлах DataNode
+        become: yes
+        become_user: hadoop
+        command: "/opt/hadoop/sbin/yarn-daemon.sh start nodemanager"
+        ignore_errors: yes
