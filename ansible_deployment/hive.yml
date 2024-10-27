@@ -1,0 +1,79 @@
+---
+- name: Установка Hive на namenode
+  hosts: master
+  vars:
+    hive_version: "4.0.1"
+    hive_home: "/opt/hive"
+    hadoop_home: "/opt/hadoop"
+    java_home: "/usr/lib/jvm/java-11-openjdk-amd64"
+
+  tasks:
+    - name: Установка необходимых пакетов
+      become: yes
+      apt:
+        name:
+        - mysql-server
+        - wget
+
+    - name: Загрузка Apache Hive
+      get_url:
+        url: "https://downloads.apache.org/hive/hive-{{ hive_version }}/apache-hive-{{ hive_version }}-bin.tar.gz"
+        dest: "/tmp/apache-hive-{{ hive_version }}-bin.tar.gz"
+
+    - name: Распаковка Hive
+      unarchive:
+        src: "/tmp/apache-hive-{{ hive_version }}-bin.tar.gz"
+        dest: /tmp/
+        remote_src: yes
+        creates: "/tmp/apache-hive-{{ hive_version }}-bin"
+
+    - name: Копирование в {{ hive_home }}
+      command: "cp -r /tmp/apache-hive-{{ hive_version }}-bin {{ hive_home }}"
+      args:
+        creates: "{{ hive_home }}"
+
+    - name: Сделать hadoop владельцем {{ hive_home }}
+      become: yes
+      command: chown -R -h hadoop:hadoop {{ hive_home }}
+
+    - name: Настройка переменных окружения для Hive
+      become: yes
+      lineinfile:
+        path: /etc/profile.d/hive.sh
+        line: 'export HIVE_HOME={{ hive_home }} && export PATH=$PATH:{{ hive_home }}/bin'
+        create: yes
+
+- name: Конфигурация Hive на namenode
+  hosts: master
+  become: yes
+  become_user: hadoop
+  vars:
+    hadoop_home: "/opt/hadoop"
+    hive_home: "/opt/hive"
+    hive_db_user: "hive"
+
+  tasks:
+    - name: Создание необходимых каталогов Hive
+      file:
+        path: "{{ hive_home }}/warehouse"
+        state: directory
+        mode: '0755'
+
+    - name: Генерация случайного пароля для Hive
+      set_fact:
+        hive_db_password: "{{ lookup('password', '/dev/null length=16 chars=ascii_letters') }}"
+
+    - name: Настройка конфигурации Hive
+      template:
+        src: hive-site.xml.j2
+        dest: "{{ hive_home }}/conf/hive-site.xml"
+      vars:
+        hive_db_password: "{{ hive_db_password }}"
+
+    - name: Инициализация метастора Hive
+      shell: "{{ hive_home }}/bin/schematool -initSchema -dbType mysql"
+      environment:
+        HADOOP_HOME: "{{ hadoop_home }}"
+
+    - name: Запуск HiveServer2
+      command: "{{ hive_home }}/bin/hive --service hiveserver2"
