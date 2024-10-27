@@ -12,7 +12,15 @@
         <value>org.apache.hadoop.mapred.ShuffleHandler</value>
     </property>
     <property>
-        <name>yarn.log.server.url</name>
-        <value>http://team-42-nn:19888/jobhistory/logs</value>
+        <name>yarn.historyServer.address</name>
+        <value>team-42-nn:19888</value>
+    </property>
+    <property>
+        <name>yarn.historyServer.webapp.address</name>
+        <value>team-42-nn:19888</value>
+    </property>
+    <property>
+        <name>mapreduce.history.server.address</name>
+        <value>team-42-nn:19888</value>
     </property>
 </configuration>

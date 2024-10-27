@@ -185,19 +185,17 @@
         register: init_hadoop_storage
         command: /opt/hadoop/bin/hdfs namenode -format
 
+      # - name: Стоп Hadoop-кластера
+      #   command: /opt/hadoop/sbin/stop-dfs.sh
+
       - name: Старт Hadoop-кластера
         command: /opt/hadoop/sbin/start-dfs.sh
+
+      # - name: Стоп YARN-кластера
+      #   command: /opt/hadoop/sbin/stop-yarn.sh
 
       - name: Старт YARN-кластера
         command: /opt/hadoop/sbin/start-yarn.sh
 
-  - name: Запуск YARN (datanodes)
-    become: yes
-    become_user: hadoop
-    hosts: datanodes
-    tasks:
-      - name: Запуск NodeManager на узлах DataNode
-        become: yes
-        become_user: hadoop
-        command: "/opt/hadoop/sbin/yarn-daemon.sh start nodemanager"
-        ignore_errors: yes
+      - name: Старт YARN History-сервера
+        command: /opt/hadoop/sbin/yarn-daemon.sh start historyserver
