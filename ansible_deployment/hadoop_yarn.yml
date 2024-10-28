@@ -184,6 +184,7 @@
         run_once: true
         register: init_hadoop_storage
         command: /opt/hadoop/bin/hdfs namenode -format
+        ignore_errors: yes
 
       # - name: Стоп Hadoop-кластера
       #   command: /opt/hadoop/sbin/stop-dfs.sh
