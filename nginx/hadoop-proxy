@@ -11,7 +11,7 @@ server {
     }
 }
 
-# Прокси для ResourceManager
+# Прокси для YARN
 server {
     listen 81;
 
