@@ -5,14 +5,20 @@
 Загружаем на namenode-хост csv-файл и передаем его в файловую систему Hadoop:
 
 ```bash
+```
+curl -L -o ./archive.zip https://www.kaggle.com/api/v1/datasets/download/abdullah0a/comprehensive-weight-change-prediction
+unzip archive.zip
+
 $ hdfs dfs -mkdir -p /user/team
-$ hdfs dfs -put /tmp/weight_change_dataset.csv /user/team
-$ /opt/hadoop/bin/hdfs dfs -ls /user/team
+$ hdfs dfs -put ./weight_change_dataset.csv /user/team
+$ hdfs dfs -ls /user/team
 Found 1 items
 -rw-r--r--   2 hadoop supergroup       7915 2024-10-29 20:54 /user/team/weight_change_dataset.csv
 ```
 
 После того, как данные загружены в hdfs, можно приступать к переносу csv-таблицы в реляционную таблицу в hive. Для этого создадим структуру таблицы в hive через утилиту beeline:
+
+`beeline -u 'jdbc:hive2://localhost:10000/'`
 
 ```sql
 CREATE EXTERNAL TABLE IF NOT EXISTS health_raw (
