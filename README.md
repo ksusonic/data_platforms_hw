@@ -5,7 +5,6 @@ https://my.mts-link.ru/courseInstance/1004347
 ---
 
 
-
 ## Практическое задание №1. Развертывание Hadoop.
 
 1. Необходимо развернуть кластер hdfs включающий в себя 3 DataNode. Должны быть запущены и выполняться следующие демоны: NameNode, Secondary NameNode и три DataNode
