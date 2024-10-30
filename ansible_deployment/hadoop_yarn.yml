@@ -51,18 +51,45 @@
         become: yes
         command: chown -R -h hadoop:hadoop {{ hadoop_install_dir }}
 
-      - name: Обновление PATH в ~/.bash_profile
+      - name: Обновление hadoop-env.sh
         become: yes
         blockinfile:
-          path: /home/hadoop/.bash_profile
+          path: "{{ hadoop_install_dir }}/etc/hadoop/hadoop-env.sh"
           create: yes
           block: |
             export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-            export HADOOP_HOME={{ hadoop_install_dir }}/
+            export HADOOP_HOME={{ hadoop_install_dir }}
             export HADOOP_MAPRED_HOME={{ hadoop_install_dir }}
             export HADOOP_HDFS_HOME={{ hadoop_install_dir }}
             export HADOOP_HOME={{ hadoop_install_dir }}
-            export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+
+
+      - name: Обновление hadoop-env.sh
+        become: yes
+        blockinfile:
+          path: "{{ hadoop_install_dir }}/etc/hadoop/hadoop-env.sh"
+          create: yes
+          block: |
+            export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+            export HADOOP_HOME=/opt/hadoop
+
+      - name: Обновление mapred-env.sh
+        become: yes
+        blockinfile:
+          path: "{{ hadoop_install_dir }}/etc/hadoop/mapred-env.sh"
+          create: yes
+          block: |
+            export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+            export HADOOP_HOME=/opt/hadoop
+
+      - name: Обновление yarn-env.sh
+        become: yes
+        blockinfile:
+          path: "{{ hadoop_install_dir }}/etc/hadoop/yarn-env.sh"
+          create: yes
+          block: |
+            export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+            export HADOOP_HOME=/opt/hadoop
 
       - name: Конфигурация core-site.xml
         become: yes
@@ -152,11 +179,8 @@
         copy:
           dest: /opt/hadoop/etc/hadoop/workers
           content: |
-
-      - name: Упоминание существующих datanodes (etc/hadoop/workers)
-        copy:
-          dest: /opt/hadoop/etc/hadoop/workers
-          src: workers.j2
+            192.168.1.172
+            192.168.1.173
 
       - name: Конфигурация mapred-site
         copy:
@@ -173,26 +197,20 @@
     become_user: hadoop
     hosts: master
     tasks:
-      - name: Инициализация хранилища (нобходимо запустить ровно 1 раз)
-        shell: /opt/hadoop/bin/hdfs namenode -format
-        ignore_errors: yes
-        environment:
-          JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
+      # - name: Инициализация хранилища (нобходимо запустить ровно 1 раз, иначе будет вечно выполняться)
+      #   shell: /opt/hadoop/bin/hdfs namenode -format
+      #   ignore_errors: yes
+      #   environment:
+      #     JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
 
       # - name: Остановка Hadoop и YARN (если запущены процессы)
       #   shell: /opt/hadoop/sbin/stop-all.sh
 
       - name: Старт Hadoop-кластера
         shell: /opt/hadoop/sbin/start-dfs.sh
-        environment:
-          JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
 
       - name: Старт YARN-кластера
         shell: /opt/hadoop/sbin/start-yarn.sh
-        environment:
-          JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
 
       - name: Старт YARN History-сервера
         shell: /opt/hadoop/sbin/mr-jobhistory-daemon.sh start historyserver
-        environment:
-          JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
