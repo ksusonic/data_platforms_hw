@@ -41,6 +41,8 @@ FIELDS TERMINATED BY ','
 STORED AS TEXTFILE
 LOCATION '/user/team/health_raw'
 TBLPROPERTIES ("skip.header.line.count"="1");
+
+LOAD DATA INPATH '/user/team/weight_change_dataset.csv' INTO TABLE health_raw;
 ```
 
 Разделим созданную таблицу на партиции по полям `gender`, `physical_activity_level`:
