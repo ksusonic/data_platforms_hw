@@ -1,0 +1,157 @@
+---
+- name: Установка Hive на namenode
+  hosts: master
+  vars:
+    hive_version: "4.0.1"
+    hive_home: "/opt/hive"
+    hadoop_home: "/opt/hadoop"
+    java_home: "/usr/lib/jvm/java-11-openjdk-amd64"
+
+  tasks:
+    - name: Установка необходимых пакетов
+      become: yes
+      apt:
+        name:
+        - mysql-server
+        - wget
+        - python3-mysqldb
+
+    - name: Загрузка Apache Hive
+      get_url:
+        url: "https://downloads.apache.org/hive/hive-{{ hive_version }}/apache-hive-{{ hive_version }}-bin.tar.gz"
+        dest: "/tmp/apache-hive-{{ hive_version }}-bin.tar.gz"
+
+    - name: Распаковка Hive
+      unarchive:
+        src: "/tmp/apache-hive-{{ hive_version }}-bin.tar.gz"
+        dest: /tmp/
+        remote_src: yes
+        creates: "/tmp/apache-hive-{{ hive_version }}-bin"
+
+    - name: Копирование в {{ hive_home }}
+      command: "cp -r /tmp/apache-hive-{{ hive_version }}-bin {{ hive_home }}"
+      args:
+        creates: "{{ hive_home }}"
+
+    - name: Сделать hadoop владельцем {{ hive_home }}
+      become: yes
+      command: chown -R -h hadoop:hadoop {{ hive_home }}
+
+    - name: Настройка переменных окружения для Hive
+      become: yes
+      lineinfile:
+        path: /etc/profile.d/hive.sh
+        line: 'export HIVE_HOME={{ hive_home }} && export PATH=$PATH:{{ hive_home }}/bin'
+        create: yes
+
+- name: Подготовка директорий Hadoop для Hive
+  hosts: master
+  become: yes
+  become_user: hadoop
+  vars:
+    hadoop_home: "/opt/hadoop"
+
+  tasks:
+    - name: "hdfs: mkdir /tmp"
+      command: "{{ hadoop_home }}/bin/hadoop fs -mkdir -p /tmp"
+
+    - name: "hdfs: chmod g+w /tmp"
+      command: "{{ hadoop_home }}/bin/hadoop fs -chmod g+w /tmp"
+
+    - name: "hdfs: mkdir /user/hive/warehouse"
+      command: "{{ hadoop_home }}/bin/hadoop fs -mkdir -p /user/hive/warehouse"
+
+    - name: "hdfs: chmod g+w /user/hive/warehouse"
+      command: "{{ hadoop_home }}/bin/hadoop fs -chmod g+w /user/hive/warehouse"
+
+- name: Настройка MySQL для Hive
+  hosts: master
+  become: yes
+  vars:
+    mysql_root_password: "root_password"  # Для production-среды сменить
+    hive_db_name: "metastore"
+    hive_db_user: "hive"
+    hive_db_password: "hive_password"  # Для production-среды сменить
+    mysql_connector_version: "9.1.0"
+
+  tasks:
+    - name: Запуск MySQL
+      shell: "service mysql start"
+
+    - name: Ожидаем старта MySQL и запуска при старте системы
+      service:
+        name: mysql
+        state: started
+        enabled: true
+
+    - name: Настройка пароля root для MySQL
+      mysql_user:
+        name: root
+        host: localhost
+        login_password: "{{ mysql_root_password }}" # может и не быть пароля, тогда нужно закомментировать строчку
+        password: "{{ mysql_root_password }}"
+        check_implicit_admin: true
+
+    - name: Создание пользователя для Hive и предоставление привилегий
+      mysql_user:
+        name: "{{ hive_db_user }}"
+        password: "{{ hive_db_password }}"
+        priv: "{{ hive_db_name }}.*:ALL"
+        host: "localhost"
+        state: present
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+
+    - name: Загузка mysql-connector TAR
+      get_url:
+        url: https://cdn.mysql.com/Downloads/Connector-J/mysql-connector-j-{{ mysql_connector_version }}.tar.gz
+        dest: /tmp/mysql-connector-j-{{ mysql_connector_version }}.tar.gz
+
+    - name: Распаковка mysql-connector
+      unarchive:
+        src: /tmp/mysql-connector-j-{{ mysql_connector_version }}.tar.gz
+        dest: /tmp/
+        remote_src: yes
+        creates: /tmp/mysql-connector-j-{{ mysql_connector_version }}.jar
+
+    - name: Копирование в /opt/hive/lib
+      command: "cp /tmp/mysql-connector-j-{{ mysql_connector_version }}/mysql-connector-j-{{ mysql_connector_version }}.jar /opt/hive/lib"
+      args:
+        creates: "/opt/hive/lib/mysql-connector-j-{{ mysql_connector_version }}.jar"
+
+- name: Конфигурация Hive на namenode
+  hosts: master
+  become: yes
+  become_user: hadoop
+  vars:
+    hadoop_home: /opt/hadoop
+    hive_home: /opt/hive
+    hive_db_user: "hive"
+    hive_db_password: "hive_password"  # Для production-среды сменить
+
+  tasks:
+    - name: Создание необходимых каталогов Hive
+      file:
+        path: "{{ hive_home }}/warehouse"
+        state: directory
+        mode: '0755'
+
+    - name: Настройка конфигурации Hive
+      template:
+        src: hive-site.xml.j2
+        dest: "{{ hive_home }}/conf/hive-site.xml"
+
+    - name: Инициализация метастора Hive (запуск только 1 раз!)
+      shell: "{{ hive_home }}/bin/schematool -initSchema -dbType mysql"
+      environment:
+        HADOOP_HOME: "{{ hadoop_home }}"
+
+    - name: Запуск Metastore
+      shell: "{{ hive_home }}/bin/hive --service metastore &"
+      environment:
+        HADOOP_HOME: "{{ hadoop_home }}"
+
+    - name: Запуск HiveServer2
+      shell: "{{ hive_home }}/bin/hive --service hiveserver2 &"
+      environment:
+        HADOOP_HOME: "{{ hadoop_home }}"

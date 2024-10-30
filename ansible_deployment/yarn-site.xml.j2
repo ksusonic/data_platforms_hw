@@ -12,15 +12,23 @@
         <value>org.apache.hadoop.mapred.ShuffleHandler</value>
     </property>
     <property>
-        <name>yarn.historyServer.address</name>
-        <value>team-42-nn:19888</value>
+        <name>yarn.log-aggregation-enable</name>
+        <value>true</value>
     </property>
     <property>
-        <name>yarn.historyServer.webapp.address</name>
-        <value>team-42-nn:19888</value>
+        <name>yarn.nodemanager.remote-app-log-dir</name>
+        <value>/tmp</value>
     </property>
     <property>
-        <name>mapreduce.history.server.address</name>
-        <value>team-42-nn:19888</value>
+        <name>yarn.nodemanager.remote-app-log-dir-suffix</name>
+        <value>logs</value>
+    </property>
+    <property>
+        <name>yarn.timeline-service.enabled</name>
+        <value>true</value>
+    </property>
+    <property>
+        <name>yarn.webapp.ui2.enable</name>
+        <value>true</value>
     </property>
 </configuration>

@@ -157,11 +157,18 @@
           owner: hadoop
           mode: 0755
 
-  - name: Запуск Hadoop (master+datanodes) и YARN (master)
+  - name: Конфигурация Hadoop и YARN
     become: yes
     become_user: hadoop
-    hosts: master
+    hosts: hadoop_cluster
     tasks:
+      - name: Упоминание существующих datanodes (etc/hadoop/workers)
+        copy:
+          dest: /opt/hadoop/etc/hadoop/workers
+          content: |
+            team-42-dn-0
+            team-42-dn-1
+
       - name: Упоминание существующих datanodes (etc/hadoop/workers)
         copy:
           dest: /opt/hadoop/etc/hadoop/workers
@@ -179,23 +186,25 @@
           dest: /opt/hadoop/etc/hadoop/yarn-site.xml
           src: yarn-site.xml.j2
 
-      # Необходимо запустить ровно 1 раз, тк может стереть существующие данные
-      - name: Инициализация хранилища
+  - name: Запуск Hadoop и YARN
+    become: yes
+    become_user: hadoop
+    hosts: master
+    tasks:
+      - name: Инициализация хранилища (нобходимо запустить ровно 1 раз)
         run_once: true
         register: init_hadoop_storage
         command: /opt/hadoop/bin/hdfs namenode -format
+        ignore_errors: yes
 
-      # - name: Стоп Hadoop-кластера
-      #   command: /opt/hadoop/sbin/stop-dfs.sh
+      - name: Остановка Hadoop и YARN (если запущены процессы)
+        command: /opt/hadoop/sbin/stop-all.sh
 
       - name: Старт Hadoop-кластера
         command: /opt/hadoop/sbin/start-dfs.sh
-
-      # - name: Стоп YARN-кластера
-      #   command: /opt/hadoop/sbin/stop-yarn.sh
 
       - name: Старт YARN-кластера
         command: /opt/hadoop/sbin/start-yarn.sh
 
       - name: Старт YARN History-сервера
-        command: /opt/hadoop/sbin/yarn-daemon.sh start historyserver
+        command: /opt/hadoop/sbin/mr-jobhistory-daemon.sh start historyserver

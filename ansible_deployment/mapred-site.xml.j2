@@ -4,15 +4,11 @@
       <value>yarn</value>
    </property>
    <property>
-      <name>yarn.app.mapreduce.am.env</name>
-      <value>HADOOP_MAPRED_HOME={{ hadoop_install_dir }}</value>
+      <name>mapreduce.jobhistory.address</name>
+      <value>team-42-nn:10020</value>
    </property>
    <property>
-      <name>mapreduce.map.env</name>
-      <value>HADOOP_MAPRED_HOME={{ hadoop_install_dir }}</value>
-   </property>
-   <property>
-      <name>mapreduce.reduce.env</name>
-      <value>HADOOP_MAPRED_HOME={{ hadoop_install_dir }}</value>
+      <name>mapreduce.jobhistory.webapp.address</name>
+      <value>team-42-nn:19888</value>
    </property>
 </configuration>
