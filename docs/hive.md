@@ -74,3 +74,8 @@ STORED AS TEXTFILE;
       sleep_quality, stress_level, final_weight, gender, physical_activity_level
   FROM health_raw;
 ```
+
+В интерфейсе YARN можно будет заметить процесс выполнения. Выполненная задача будет выглядеть примерно так:
+<img width="979" alt="image" src="https://github.com/user-attachments/assets/de649e4a-4562-45ac-aff5-66d8306a2aa1">
+
+
