@@ -29,6 +29,7 @@
         creates: "/tmp/apache-hive-{{ hive_version }}-bin"
 
     - name: Копирование в {{ hive_home }}
+      become: yes
       command: "cp -r /tmp/apache-hive-{{ hive_version }}-bin {{ hive_home }}"
       args:
         creates: "{{ hive_home }}"
@@ -53,16 +54,16 @@
 
   tasks:
     - name: "hdfs: mkdir /tmp"
-      command: "{{ hadoop_home }}/bin/hadoop fs -mkdir -p /tmp"
+      command: "{{ hadoop_home }}/bin/hdfs dfs -mkdir -p /tmp"
 
     - name: "hdfs: chmod g+w /tmp"
-      command: "{{ hadoop_home }}/bin/hadoop fs -chmod g+w /tmp"
+      command: "{{ hadoop_home }}/bin/hdfs dfs -chmod g+w /tmp"
 
     - name: "hdfs: mkdir /user/hive/warehouse"
-      command: "{{ hadoop_home }}/bin/hadoop fs -mkdir -p /user/hive/warehouse"
+      command: "{{ hadoop_home }}/bin/hdfs dfs -mkdir -p /user/hive/warehouse"
 
     - name: "hdfs: chmod g+w /user/hive/warehouse"
-      command: "{{ hadoop_home }}/bin/hadoop fs -chmod g+w /user/hive/warehouse"
+      command: "{{ hadoop_home }}/bin/hdfs dfs -chmod g+w /user/hive/warehouse"
 
 - name: Настройка MySQL для Hive
   hosts: master
@@ -146,6 +147,8 @@
       environment:
         HADOOP_HOME: "{{ hadoop_home }}"
 
+    # ВНИМАНИЕ: После выполнения команды процессы могут не отделиться от сессии и убьются вместе с завершением скрипта ansible.
+    # Проследите вручную, чтобы они работали через утилиту jps
     - name: Запуск Metastore
       shell: "{{ hive_home }}/bin/hive --service metastore &"
       environment:

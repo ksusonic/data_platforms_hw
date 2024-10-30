@@ -10,6 +10,7 @@
 
     tasks:
       - name: Создание пользователя hadoop
+        become: yes
         user:
           name: "{{ hadoop_user }}"
           shell: /bin/bash
@@ -24,6 +25,7 @@
             - unzip
             - gzip
           state: present
+          update_cache: yes
 
       - name: Загрузка архива Hadoop
         get_url:
@@ -40,6 +42,7 @@
           creates: /tmp/hadoop-{{ hadoop_version }}
 
       - name: Копирование в {{ hadoop_install_dir }}
+        become: yes
         command: "cp -r /tmp/hadoop-{{ hadoop_version }} {{ hadoop_install_dir }}"
         args:
           creates: "{{ hadoop_install_dir }}"
@@ -48,35 +51,45 @@
         become: yes
         command: chown -R -h hadoop:hadoop {{ hadoop_install_dir }}
 
-      - name: Настройка переменных окружения для Hadoop
+      - name: Обновление hadoop-env.sh
         become: yes
         blockinfile:
-          path: /etc/profile.d/hadoop.sh
+          path: "{{ hadoop_install_dir }}/etc/hadoop/hadoop-env.sh"
           create: yes
           block: |
             export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-            export HADOOP_HOME={{ hadoop_install_dir }}/
+            export HADOOP_HOME={{ hadoop_install_dir }}
             export HADOOP_MAPRED_HOME={{ hadoop_install_dir }}
             export HADOOP_HDFS_HOME={{ hadoop_install_dir }}
             export HADOOP_HOME={{ hadoop_install_dir }}
-            export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
 
-      - name: Создание директории /var/hadoop для hadoop
-        become: yes
-        file:
-          path: /var/hadoop
-          state: directory
-          owner: hadoop
 
-      - name: Настройка переменных окружения для Hadoop
+      - name: Обновление hadoop-env.sh
         become: yes
         blockinfile:
-          path: /etc/hosts
+          path: "{{ hadoop_install_dir }}/etc/hadoop/hadoop-env.sh"
           create: yes
           block: |
-            192.168.1.171 team-42-nn
-            192.168.1.172 team-42-dn-0
-            192.168.1.173 team-42-dn-1
+            export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+            export HADOOP_HOME=/opt/hadoop
+
+      - name: Обновление mapred-env.sh
+        become: yes
+        blockinfile:
+          path: "{{ hadoop_install_dir }}/etc/hadoop/mapred-env.sh"
+          create: yes
+          block: |
+            export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+            export HADOOP_HOME=/opt/hadoop
+
+      - name: Обновление yarn-env.sh
+        become: yes
+        blockinfile:
+          path: "{{ hadoop_install_dir }}/etc/hadoop/yarn-env.sh"
+          create: yes
+          block: |
+            export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+            export HADOOP_HOME=/opt/hadoop
 
       - name: Конфигурация core-site.xml
         become: yes
@@ -166,15 +179,8 @@
         copy:
           dest: /opt/hadoop/etc/hadoop/workers
           content: |
-            team-42-dn-0
-            team-42-dn-1
-
-      - name: Упоминание существующих datanodes (etc/hadoop/workers)
-        copy:
-          dest: /opt/hadoop/etc/hadoop/workers
-          content: |
-            team-42-dn-0
-            team-42-dn-1
+            192.168.1.172
+            192.168.1.173
 
       - name: Конфигурация mapred-site
         copy:
@@ -191,20 +197,20 @@
     become_user: hadoop
     hosts: master
     tasks:
-      - name: Инициализация хранилища (нобходимо запустить ровно 1 раз)
-        run_once: true
-        register: init_hadoop_storage
-        command: /opt/hadoop/bin/hdfs namenode -format
+      - name: Инициализация хранилища (нобходимо запустить ровно 1 раз, иначе будет вечно выполняться)
+        shell: /opt/hadoop/bin/hdfs namenode -format
         ignore_errors: yes
+        environment:
+          JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
 
-      - name: Остановка Hadoop и YARN (если запущены процессы)
-        command: /opt/hadoop/sbin/stop-all.sh
+      # - name: Остановка Hadoop и YARN (если запущены процессы)
+      #   shell: /opt/hadoop/sbin/stop-all.sh
 
       - name: Старт Hadoop-кластера
-        command: /opt/hadoop/sbin/start-dfs.sh
+        shell: /opt/hadoop/sbin/start-dfs.sh
 
       - name: Старт YARN-кластера
-        command: /opt/hadoop/sbin/start-yarn.sh
+        shell: /opt/hadoop/sbin/start-yarn.sh
 
       - name: Старт YARN History-сервера
-        command: /opt/hadoop/sbin/mr-jobhistory-daemon.sh start historyserver
+        shell: /opt/hadoop/sbin/mr-jobhistory-daemon.sh start historyserver
