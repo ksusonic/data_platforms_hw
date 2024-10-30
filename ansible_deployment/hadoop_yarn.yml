@@ -197,11 +197,11 @@
     become_user: hadoop
     hosts: master
     tasks:
-      # - name: Инициализация хранилища (нобходимо запустить ровно 1 раз, иначе будет вечно выполняться)
-      #   shell: /opt/hadoop/bin/hdfs namenode -format
-      #   ignore_errors: yes
-      #   environment:
-      #     JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
+      - name: Инициализация хранилища (нобходимо запустить ровно 1 раз, иначе будет вечно выполняться)
+        shell: /opt/hadoop/bin/hdfs namenode -format
+        ignore_errors: yes
+        environment:
+          JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
 
       # - name: Остановка Hadoop и YARN (если запущены процессы)
       #   shell: /opt/hadoop/sbin/stop-all.sh
