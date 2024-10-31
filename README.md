@@ -19,7 +19,13 @@ https://my.mts-link.ru/courseInstance/1004347
 ### Инструкция по поднятию сервисов в кластере
 
 1) Настройте окружение для выполнения ansible-скриптов. Чтобы не прокидывать пароль в sudo-команды только от пользователя team (!), данный пользователь добавляется в nopasswd-sudoers. 
-2) Запустите ansible-playbook в соответствии с заданиями: задание 1-2: hadoop_yarn.yaml задание 3: hive.yml
+2) Запустите ansible-playbook в соответствии с заданиями: задание 1-2: hadoop_yarn.yaml задание 3: hive.yml. Подробнее в [ansible_deployment/README.md](ansible_deployment/README.md)
+
+Описание практической работы по партицированию таблицы hive находится в [hive.md](docs/hive.md) 
+
+---
+
+# Описания заданий
 
 ## Практическое задание №1. Развертывание Hadoop.
 
