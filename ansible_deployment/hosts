@@ -1,3 +1,6 @@
+[jumpnode]
+team-42-jn ansible_host=192.168.1.170
+
 [master]
 team-42-nn ansible_host=192.168.1.171
 
@@ -6,5 +9,10 @@ team-42-dn-0 ansible_host=192.168.1.172
 team-42-dn-1 ansible_host=192.168.1.173
 
 [hadoop_cluster:children]
+master
+datanodes
+
+[all_nodes:children]
+jumpnode
 master
 datanodes

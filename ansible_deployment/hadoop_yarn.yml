@@ -1,20 +1,42 @@
 ---
   - name: Установка Hadoop на кластер
-    hosts: hadoop_cluster
+    hosts: all_nodes
     vars:
       ansible_remote_tmp: /tmp
       hadoop_version: 3.4.0
       hadoop_install_dir: /opt/hadoop
       hadoop_user: hadoop
       master_node: "team-42-nn"
+      profile_path: "/home/hadoop/.profile"
+      java_home: "/usr/lib/jvm/java-11-openjdk-amd64"
+      hadoop_home: "/opt/hadoop"
 
     tasks:
+      - name: Размещение /etc/hosts
+        become: yes
+        copy:
+          dest: "/etc/hosts"
+          src: node_hosts
+          mode: "0644"
+
       - name: Создание пользователя hadoop
         become: yes
         user:
           name: "{{ hadoop_user }}"
           shell: /bin/bash
           create_home: yes
+
+      - name: Объявление необходимых переменных
+        become_user: hadoop
+        become: yes
+        blockinfile:
+          path: "{{ profile_path }}"
+          create: yes
+          insertafter: EOF
+          block: |
+            export JAVA_HOME={{ java_home }}
+            export HADOOP_HOME={{ hadoop_home }}
+            export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$HIVE_HOME/bin:$JAVA_HOME/bin
 
       - name: Установка необходимых пакетов
         become: yes
@@ -134,7 +156,7 @@
           hadoop_public_key: "{{ ssh_public_key_content['content'] | b64decode }}"
 
   - name: Распространение SSH ключей на узлы кластера Hadoop
-    hosts: hadoop_cluster
+    hosts: all_nodes
     become: yes
     become_user: hadoop
     tasks:
@@ -171,9 +193,9 @@
           mode: 0755
 
   - name: Конфигурация Hadoop и YARN
+    hosts: all_nodes
     become: yes
     become_user: hadoop
-    hosts: hadoop_cluster
     tasks:
       - name: Упоминание существующих datanodes (etc/hadoop/workers)
         copy:
@@ -193,9 +215,9 @@
           src: yarn-site.xml.j2
 
   - name: Запуск Hadoop и YARN
+    hosts: master
     become: yes
     become_user: hadoop
-    hosts: master
     tasks:
       - name: Инициализация хранилища (нобходимо запустить ровно 1 раз, иначе будет вечно выполняться)
         shell: /opt/hadoop/bin/hdfs namenode -format

@@ -32,6 +32,7 @@ if ! [[ -f ~/.ssh/id_rsa ]]; then
     echo "Генерирую ssh-ключ..."
     mkdir -p ~/.ssh
     ssh-keygen -b 2048 -t rsa -q -N "" -f ~/.ssh/id_rsa
+    cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
 fi
 
 if [[ ! -f /etc/sudoers.d/$USER ]]; then
