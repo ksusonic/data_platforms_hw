@@ -1,0 +1,71 @@
+---
+- name: Spark Job Pipeline
+  hosts: jumpnode
+  become: yes
+  vars:
+    profile_path: "/home/hadoop/.profile"
+    java_home: "/usr/lib/jvm/java-11-openjdk-amd64"
+    hadoop_home: "/opt/hadoop"
+    hadoop_conf_dir: "/opt/hadoop/etc/hadoop"
+    hive_home: "/opt/hive"
+    hive_conf_dir: "/opt/hive/conf"
+    hive_aux_jars_path: "/opt/hive/lib/*"
+    python_venv_name: ".spark_test_venv"
+
+  tasks:
+    - name: Объявление необходимых переменных
+      blockinfile:
+        path: "{{ profile_path }}"
+        create: yes
+        insertafter: EOF
+        block: |
+          export JAVA_HOME={{ java_home }}
+          export HADOOP_HOME={{ hadoop_home }}
+          export HADOOP_CONF_DIR={{ hadoop_conf_dir }}
+          export HIVE_HOME={{ hive_home }}
+          export HIVE_CONF_DIR={{ hive_conf_dir }}
+          export HIVE_AUX_JARS_PATH={{ hive_aux_jars_path }}
+          export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$HIVE_HOME/bin:$JAVA_HOME
+
+    - name: Активация переменных
+      become: yes
+      shell: source {{ profile_path }}
+      args:
+        executable: /bin/bash
+
+    - name: Установка пакета python-venv
+      become: yes
+      apt:
+        name: python3.12-venv
+
+    - name: Создание venv
+      become: yes
+      shell: |
+        python3 -m venv /home/hadoop/{{ python_venv_name }}
+
+    - name: Установка всех необходимых пакетов
+      become: yes
+      pip:
+        name:
+          - pyspark
+          - onetl
+        virtualenv: /home/hadoop/{{ python_venv_name }}
+
+    - name: Размещение скрипта Spark Job
+      become: yes
+      copy:
+        dest: "/home/hadoop/spark_test.py"
+        src: spark_test.py
+
+    - name: Активация скрипта Spark Job
+      become_user: hadoop
+      become: yes
+      shell: |
+        source /home/hadoop/{{ python_venv_name }}/bin/activate
+        python /home/hadoop/spark_test.py
+      args:
+        executable: /bin/bash
+      environment:
+        HADOOP_HOME: "{{ hadoop_home }}"
+        JAVA_HOME: "{{ java_home }}"
+        HADOOP_CONF_DIR: "{{ hadoop_conf_dir }}"

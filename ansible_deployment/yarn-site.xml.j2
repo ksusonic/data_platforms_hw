@@ -4,10 +4,6 @@
         <value>192.168.1.171</value>
     </property>
     <property>  
-        <name>yarn.resourcemanager.resource-tracker.address</name>  
-        <value>192.168.1.171:8025</value>  
-    </property>  
-    <property>  
         <name>yarn.resourcemanager.scheduler.address</name>  
         <value>192.168.1.171:8030</value>  
     </property>  
@@ -23,4 +19,32 @@
         <name>yarn.webapp.ui2.enable</name>
         <value>true</value>
     </property>
+    <property>
+        <name>yarn.resourcemanager.address</name>
+        <value>192.168.1.171:8032</value>
+    </property>
+    <property>
+         <name>yarn.resourcemanager.resource-tracker.address</name>
+         <value>192.168.1.171:8031</value>
+    </property>
+    <property>
+          <name>yarn.application.classpath</name>
+          <value>
+                $HADOOP_HOME/etc/*,
+                $HADOOP_HOME/etc/hadoop/*,
+                $HADOOP_HOME/lib/*,
+                $HADOOP_HOME/share/hadoop/common/*,
+                $HADOOP_HOME/share/hadoop/common/lib/*,
+                $HADOOP_HOME/share/hadoop/hdfs/*,
+                $HADOOP_HOME/share/hadoop/hdfs/lib/*,
+                $HADOOP_HOME/share/hadoop/mapreduce/*,
+                $HADOOP_HOME/share/hadoop/mapreduce/lib/*,
+                $HADOOP_HOME/share/hadoop/yarn/*,
+                $HADOOP_HOME/share/hadoop/yarn/lib/*
+          </value>
+      </property>
+      <property>
+          <name>yarn.nodemanager.env-whitelist</name>
+          <value>JAVA_HOME,HADOOP_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,CLASSPATH_PREPEND_DISTCACHE,HADOOP_MAPRED_HOME,HADOOP_YARN_HOME,HADOOP_HOME,PATH,LANG,TZ,HADOOP_MAPRED_HOME</value>
+       </property>
 </configuration>

@@ -9,3 +9,13 @@ ansible-playbook -i hosts hadoop_yarn.yml
 ```shell
 ansible-playbook -i hosts hive.yml
 ```
+
+Для разворачивания Spark используется playbook `spark.yml`:
+```shell
+ansible-playbook -i hosts spark.yml
+```
+
+Для разворачивания Airflow используется playbook `airflow.yml`:
+```shell
+ansible-playbook -i hosts airflow.yml
+```

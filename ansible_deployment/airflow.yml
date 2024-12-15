@@ -1,0 +1,100 @@
+---
+- name: Airflow Pipeline
+  hosts: jumpnode
+  become: yes
+  become_user: hadoop
+  vars:
+    profile_path: "/home/hadoop/.profile"
+    java_home: "/usr/lib/jvm/java-11-openjdk-amd64"
+    hadoop_home: "/opt/hadoop"
+    hadoop_conf_dir: "/opt/hadoop/etc/hadoop"
+    hive_home: "/opt/hive"
+    hive_conf_dir: "/opt/hive/conf"
+    hive_aux_jars_path: "/opt/hive/lib/*"
+    airflow_home: "/home/hadoop/airflow"
+    airflow__core__load_example: "False"
+    airflow__core__dags_folder: "{{ airflow_home }}/dags"
+    airflow__core__plugins_folder: "{{ airflow_home }}/plugins"
+    python_venv_name: ".airflow_test_venv"
+
+  tasks:
+    - name: Объявление необходимых переменных
+      blockinfile:
+        path: "{{ profile_path }}"
+        create: yes
+        insertafter: EOF
+        block: |
+          export JAVA_HOME={{ java_home }}
+          export HADOOP_HOME={{ hadoop_home }}
+          export HADOOP_CONF_DIR={{ hadoop_conf_dir }}
+          export HIVE_HOME={{ hive_home }}
+          export HIVE_CONF_DIR={{ hive_conf_dir }}
+          export HIVE_AUX_JARS_PATH={{ hive_aux_jars_path }}
+          export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$HIVE_HOME/bin:$JAVA_HOME
+          export AIRFLOW_HOME={{ airflow_home }}
+          export AIRFLOW__CORE__LOAD_EXAMPLES={{ airflow__core__load_example }}
+          export AIRFLOW__CORE__DAGS_FOLDER={{ airflow__core__dags_folder }}
+
+    - name: Активация переменных
+      become: yes
+      shell: source {{ profile_path }}
+      args:
+        executable: /bin/bash
+
+    - name: Создание директорий для airflow
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0777"
+      with_items:
+        - "{{ airflow_home }}"
+        - "{{ airflow__core__dags_folder }}"
+        - "{{ airflow__core__plugins_folder }}"
+
+    - name: Размещение скрипта DAG для Spark Job
+      become: yes
+      copy:
+        dest: "{{ airflow__core__dags_folder }}/dag_spark_test.py"
+        src: dag_spark_test.py
+        mode: '0777'
+
+    - name: Создание venv
+      become: yes
+      shell: python3 -m venv /home/hadoop/{{ python_venv_name }}
+
+    - name: Установка всех необходимых пакетов
+      become: yes
+      pip:
+        name:
+          - pyspark
+          - onetl
+          - apache-airflow[sqlite]
+        virtualenv: /home/hadoop/{{ python_venv_name }}
+
+    - name: Airflow init
+      become: yes
+      shell: |
+        source /home/hadoop/{{ python_venv_name }}/bin/activate
+        airflow db init
+        airflow users create \
+            --username airflow \
+            --firstname airflow \
+            --lastname airflow \
+            --role Admin \
+            --email airflow@test.com \
+            --password airflow
+      args:
+        executable: /bin/bash
+
+    # ВНИМАНИЕ: После выполнения команды процессы могут не отделиться от сессии и убьются вместе с завершением скрипта ansible.
+    # Проследите вручную, чтобы они работали через ps aux | grep airflow (от юзера hadoop)
+    - name: Запуск Airflow webserver и scheduler
+      become: yes
+      shell: |
+        source /home/hadoop/{{ python_venv_name }}/bin/activate
+        nohup airflow webserver --port 8084 > ~/airflow/logs/webserver.log 2>&1 &
+        nohup airflow scheduler > ~/airflow/logs/scheduler.log 2>&1 &
+      environment:
+        HADOOP_HOME: "{{ hadoop_home }}"
+        JAVA_HOME: "{{ java_home }}"
+        HADOOP_CONF_DIR: "{{ hadoop_conf_dir }}"

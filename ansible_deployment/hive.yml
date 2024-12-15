@@ -1,8 +1,8 @@
 ---
-- name: Установка Hive на namenode
-  hosts: master
+- name: Установка Hive на jumpnode
+  hosts: jumpnode
   vars:
-    hive_version: "4.0.1"
+    hive_version: "4.0.0-alpha-2"
     hive_home: "/opt/hive"
     hadoop_home: "/opt/hadoop"
     java_home: "/usr/lib/jvm/java-11-openjdk-amd64"
@@ -18,7 +18,7 @@
 
     - name: Загрузка Apache Hive
       get_url:
-        url: "https://downloads.apache.org/hive/hive-{{ hive_version }}/apache-hive-{{ hive_version }}-bin.tar.gz"
+        url: "https://archive.apache.org/dist/hive/hive-{{ hive_version }}/apache-hive-{{ hive_version }}-bin.tar.gz"
         dest: "/tmp/apache-hive-{{ hive_version }}-bin.tar.gz"
 
     - name: Распаковка Hive
@@ -46,7 +46,7 @@
         create: yes
 
 - name: Подготовка директорий Hadoop для Hive
-  hosts: master
+  hosts: jumpnode
   become: yes
   become_user: hadoop
   vars:
@@ -66,7 +66,7 @@
       command: "{{ hadoop_home }}/bin/hdfs dfs -chmod g+w /user/hive/warehouse"
 
 - name: Настройка MySQL для Hive
-  hosts: master
+  hosts: jumpnode
   become: yes
   vars:
     mysql_root_password: "root_password"  # Для production-среды сменить
@@ -120,8 +120,8 @@
       args:
         creates: "/opt/hive/lib/mysql-connector-j-{{ mysql_connector_version }}.jar"
 
-- name: Конфигурация Hive на namenode
-  hosts: master
+- name: Конфигурация Hive на jumpnode
+  hosts: jumpnode
   become: yes
   become_user: hadoop
   vars:
@@ -148,13 +148,13 @@
         HADOOP_HOME: "{{ hadoop_home }}"
 
     # ВНИМАНИЕ: После выполнения команды процессы могут не отделиться от сессии и убьются вместе с завершением скрипта ansible.
-    # Проследите вручную, чтобы они работали через утилиту jps
+    # Проследите вручную, чтобы они работали через утилиту jps (от юзера hadoop)
     - name: Запуск Metastore
-      shell: "{{ hive_home }}/bin/hive --service metastore &"
+      shell: "{{ hive_home }}/bin/hive --service metastore 1>> /tmp/ms.log 2>> /tmp/ms.log &"
       environment:
         HADOOP_HOME: "{{ hadoop_home }}"
 
     - name: Запуск HiveServer2
-      shell: "{{ hive_home }}/bin/hive --service hiveserver2 &"
+      shell: "{{ hive_home }}/bin/hive --hiveconf hive.server2.enable.doAs=false --hiveconf hive.security.authorization.enabled=false --service hiveserver2 1>> /tmp/hs2.log 2>> /tmp/hs2.log &"
       environment:
         HADOOP_HOME: "{{ hadoop_home }}"
